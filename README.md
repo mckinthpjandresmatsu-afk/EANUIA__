@@ -1,2 +1,128 @@
-# EANUIA__
-Pre order here 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>EUNOIA Online Pre-Order</title>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
+
+    <style>
+        body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #0b2e13; color: gold; min-height: 100vh; display: flex; flex-direction: column; align-items: center; }
+        .container { background: rgba(0,0,0,0.9); padding: 30px; border-radius: 16px; width: 90%; max-width: 400px; margin: 20px auto; box-shadow: 0 0 25px rgba(255,215,0,0.3); text-align: center; border: 1px solid gold; }
+        .section { margin-top: 15px; text-align: left; border-bottom: 1px solid rgba(255,215,0,0.2); padding-bottom: 15px; }
+        label { display: block; margin: 10px 0; cursor: pointer; }
+        input[type="text"] { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid gold; background: #000; color: #fff; box-sizing: border-box; }
+        .total-box { font-size: 24px; font-weight: bold; margin: 20px 0; padding: 10px; background: rgba(255,215,0,0.1); border-radius: 8px; border: 1px solid gold; }
+        button { width: 100%; padding: 15px; background: gold; color: #0b2e13; border: none; border-radius: 8px; font-size: 18px; cursor: pointer; font-weight: bold; }
+        .hidden { display: none; }
+        .order-card { background: rgba(255,255,255,0.05); padding: 10px; margin: 10px 0; border-radius: 5px; text-align: left; border-left: 4px solid gold; }
+    </style>
+</head>
+<body>
+
+<div class="container" id="orderPage">
+    <h1>EUNOIA</h1>
+    <div class="section">
+        <label>Full Name:</label>
+        <input type="text" id="custName" placeholder="Enter your name...">
+    </div>
+    <div class="section">
+        <strong>Flowers</strong>
+        <label><input type="checkbox" class="product" value="Focal+Accent+Fillers" data-price="150"> Focal+Accent+Fillers (₱150)</label>
+        <label><input type="checkbox" class="product" value="Focal+Fillers" data-price="130"> Focal+Fillers (₱130)</label>
+        <label><input type="checkbox" class="product" value="Accent+Fillers" data-price="100"> Accent+Fillers (₱100)</label>
+    </div>
+    <div class="section">
+        <strong>Bracelets</strong>
+        <label><input type="checkbox" class="product" value="Bracelet" data-price="35"> Bracelet (₱35)</label>
+        <label><input type="checkbox" class="product" value="Couple Bracelet" data-price="60"> Couple Bracelet (₱60)</label>
+    </div>
+    <div class="total-box">Total: ₱<span id="displayTotal">0</span></div>
+    <button onclick="processOrder()">Confirm Pre-Order</button>
+    <div style="margin-top:20px; font-size:10px; opacity:0.3; cursor:pointer;" onclick="viewAdmin()">ADMIN</div>
+</div>
+
+<div class="container hidden" id="receiptPage">
+    <h1>ORDER SAVED!</h1>
+    <p>Show this at the booth:</p>
+    <div id="resCode" style="font-size: 40px; font-weight: bold; color: #fff;"></div>
+    <button onclick="window.location.reload()">New Order</button>
+</div>
+
+<div class="container hidden" id="adminPage">
+    <h1>ADMIN DASHBOARD</h1>
+    <div id="orderList">Loading...</div>
+    <button onclick="window.location.reload()">Back</button>
+</div>
+
+<script>
+    // =========================================================
+    // PASTE YOUR FIREBASE VALUES BELOW BETWEEN THE QUOTES ""
+    // =========================================================
+    const firebaseConfig = {
+        apiKey: "AIzaSyD5_sdSFUaCBn6cdZ8OonO8MIVxkThIbXk",
+        authDomain: "preorder-18bd2.firebaseapp.com",
+        databaseURL: "https://preorder-18bd2-default-rtdb.firebaseio.com/",
+        projectId: "preorder-18bd2",
+        storageBucket: "preorder-18bd2.firebasestorage.app",
+        messagingSenderId: "831154608286",
+        appId: "1:831154608286:web:f2021a89e70eda9775438f"
+    };
+    // =========================================================
+
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
+    // Total Calculator logic
+    const items = document.querySelectorAll('.product');
+    items.forEach(item => {
+        item.addEventListener('change', () => {
+            let currentTotal = 0;
+            document.querySelectorAll('.product:checked').forEach(checked => {
+                currentTotal += parseInt(checked.getAttribute('data-price'));
+            });
+            document.getElementById('displayTotal').innerText = currentTotal;
+        });
+    });
+
+    function processOrder() {
+        const name = document.getElementById('custName').value;
+        const selected = document.querySelectorAll('.product:checked');
+        const total = document.getElementById('displayTotal').innerText;
+
+        if (!name || selected.length === 0) {
+            alert("Name and selection required!");
+            return;
+        }
+
+        const code = "EU-" + Math.floor(1000 + Math.random() * 9000);
+        const itemList = Array.from(selected).map(i => i.value).join(", ");
+
+        // SEND TO FIREBASE
+        database.ref('orders').push({
+            name, items: itemList, total, code, timestamp: Date.now()
+        }).then(() => {
+            document.getElementById('orderPage').classList.add('hidden');
+            document.getElementById('receiptPage').classList.remove('hidden');
+            document.getElementById('resCode').innerText = code;
+        }).catch(e => alert("Error: " + e.message));
+    }
+
+    function viewAdmin() {
+        if (prompt("Password:") !== "197") return;
+        document.getElementById('orderPage').classList.add('hidden');
+        document.getElementById('adminPage').classList.remove('hidden');
+
+        database.ref('orders').on('value', (snap) => {
+            const listDiv = document.getElementById('orderList');
+            listDiv.innerHTML = "";
+            const data = snap.val();
+            if (!data) { listDiv.innerHTML = "No orders."; return; }
+            Object.values(data).reverse().forEach(o => {
+                listDiv.innerHTML += `<div class="order-card"><strong>${o.code}</strong>: ${o.name}<br>₱${o.total} - ${o.items}</div>`;
+            });
+        });
+    }
+</script>
+</body>
+</html>
